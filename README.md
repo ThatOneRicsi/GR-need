@@ -24,6 +24,10 @@ GR !need is a SourceMod plugin that allows players to send a Discord webhook not
 - SourceMod 1.11 or later
 - **SteamWorks Extension** - This plugin requires the SteamWorks extension to send HTTP requests to Discord
 
+## Disclaimer
+
+This plugin is primarily designed for Discord webhooks, though Discord alternatives that support webhooks may work. It is mainly developed for CS:GO, but other Source engine games may work as well.
+
 ## Installation
 
 1. **Extract the plugin files:**
@@ -176,84 +180,82 @@ To display map images in your Discord messages:
 
 ### Webhook Permissions
 
-Ensure the webhook has permissions in the target channel:
-- Send Messages
-- Embed Links
-- Attach Files
+Ensure the webhook has set to send messages in your desired channel.
 
-## Advanced Configuration Examples
+## Configuration Examples
 
-### Minimal Setup
+### Basic Setup
+Add these lines to `cfg/sourcemod/need_webhook.cfg`:
+
 ```
-sm_needwebhook_url "https://discord.com/api/webhooks/YOUR_ID/YOUR_TOKEN"
-sm_needwebhook_message "@EU server is looking for players!"
-sm_needwebhook_connect "connect your.server.ip:port"
+sm_needwebhook_url "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN"
+sm_needwebhook_connect "connect 127.0.0.1:27015"
 ```
 
-### With Map Images
+This gives you a working setup with default embed formatting.
+
+### Custom Message with Ping
+To send a custom message that pings a role:
+
 ```
-sm_needwebhook_image_base "https://cdn.example.com/game/map-images"
-sm_needwebhook_image_ext "png"
+sm_needwebhook_message "@everyone Server needs players!"
+sm_needwebhook_embed_title "{CURRENT}/{MAX} - Help needed!"
+```
+
+### Map Images
+To show map screenshots in Discord:
+
+```
+sm_needwebhook_image_base "https://example.com/maps"
+sm_needwebhook_image_ext "jpg"
 sm_needwebhook_image_include_prefix "0"
 ```
 
-### Detailed Formatting
-```
-sm_needwebhook_embed_title "🎮 {CURRENT}/{MAX} Players - {MAP}"
-sm_needwebhook_embed_description "**Mode:** {MODE}\n**Needed by:** {PLAYER}"
-sm_needwebhook_mode "Competitive 5v5"
-sm_needwebhook_footer "Play now: {CONNECT}"
-```
+This will display images like `https://example.com/maps/dust2.jpg` for the current map.
 
-### Without Cooldown
+
+### Disable Cooldown (not recommended)
+To allow unlimited `!need` commands:
+
 ```
 sm_needwebhook_cooldown "0"
+```
+
+### Competitive Server Setup
+For a competitive server:
+
+```
+sm_needwebhook_mode "Competitive"
+sm_needwebhook_embed_title "{CURRENT}/{MAX} - {MODE} Match"
+sm_needwebhook_status_text "Matchmaking"
+sm_needwebhook_cooldown "300"
 ```
 
 ## Troubleshooting
 
 ### Plugin Fails to Load
 - **Cause:** SteamWorks extension is not installed
-- **Solution:** Install the SteamWorks extension for SourceMod. Check the SourceMod forums for the latest version
+- **Solution:** Install the SteamWorks extension for SourceMod
 
 ### Command Shows "Webhook URL is not configured"
 - **Cause:** `sm_needwebhook_url` is empty
-- **Solution:** Open `cfg/sourcemod/need_webhook.cfg` and set your Discord webhook URL
+- **Solution:** Set your Discord webhook URL in `cfg/sourcemod/need_webhook.cfg`
 
 ### Messages Don't Appear in Discord
 - **Cause:** Webhook URL is incorrect or Discord API is unreachable
-- **Solution:** 
-  - Verify your webhook URL is correct
-  - Check server logs for error messages: `tail logs/error_YYYYMMDD.log`
-  - Ensure the webhook hasn't been deleted from Discord
-  - Verify your server can reach Discord's API
+- **Solution:** Verify your webhook URL is correct and the webhook exists
 
 ### "Please wait X more seconds" Message
 - **Cause:** Cooldown timer hasn't expired
-- **Solution:** This is working as intended. Wait for the specified cooldown period
+- **Solution:** Wait for the cooldown period to end
 
 ### Maps Not Appearing as Images
 - **Cause:** Base URL is empty or incorrect, image files don't exist
-- **Solution:**
-  - Verify `sm_needwebhook_image_base` is set correctly
-  - Ensure image files exist at the configured URL
-  - Check file names match your map names
+- **Solution:** Set `sm_needwebhook_image_base` correctly and ensure image files exist
 
 ### Special Characters Display Incorrectly in Discord
 - **Cause:** JSON escaping issues
-- **Solution:** The plugin automatically escapes special characters. Avoid using quotes and backslashes in template fields
-
-## Performance Considerations
-
-- HTTP requests to Discord are sent asynchronously and don't block server operations
-- Webhook responses are logged only on failure
-- The plugin requires minimal server resources
-- Default cooldown (20 minutes) prevents excessive webhook usage
-
-## Community
-
-For the best CS:GO revival community: https://discord.globalretake.com
-Our website: https://globalretake.com
+- **Solution:** The plugin automatically escapes special characters
 
 ## License
 
@@ -261,6 +263,6 @@ This plugin is licensed under the MIT License. You are free to use, modify, and 
 
 ---
 
-**Last Updated:** 2026-04-12  
+**Last updated:** 2026.04.12 \
 **Compatible SourceMod Version:** 1.11+  
 **Dependencies:** SteamWorks Extension
