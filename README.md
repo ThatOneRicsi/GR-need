@@ -180,7 +180,7 @@ To display map images in your Discord messages:
 
 ### Webhook Permissions
 
-Ensure the webhook has set to send messages in your desired channel.
+Ensure the webhook has permission to send messages in the target channel.
 
 ## Configuration Examples
 
@@ -213,8 +213,17 @@ sm_needwebhook_image_include_prefix "0"
 
 This will display images like `https://example.com/maps/dust2.jpg` for the current map.
 
+### Custom Embed Styling
+For a more detailed embed:
 
-### Disable Cooldown (not recommended)
+```
+sm_needwebhook_embed_title "🔥 {CURRENT}/{MAX} players needed!"
+sm_needwebhook_embed_description "Map: {MAP}\nMode: {MODE}\nRequested by: {PLAYER}"
+sm_needwebhook_embed_color "#ff0000"
+sm_needwebhook_footer "Join now: {CONNECT}"
+```
+
+### Disable Cooldown
 To allow unlimited `!need` commands:
 
 ```
@@ -263,6 +272,5 @@ This plugin is licensed under the MIT License. You are free to use, modify, and 
 
 ---
 
-**Last updated:** 2026.04.12 \
 **Compatible SourceMod Version:** 1.11+  
 **Dependencies:** SteamWorks Extension
