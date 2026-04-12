@@ -67,7 +67,7 @@ All configuration is done through ConVars in `cfg/sourcemod/need_webhook.cfg`:
 
 | ConVar | Default | Description |
 |--------|---------|-------------|
-| `sm_needwebhook_message` | `Players needed! @EU server ping` | Plain text content in the Discord message (great for pings) |
+| `sm_needwebhook_message` | `Players needed! @everyone` | Plain text content in the Discord message (great for pings) |
 | `sm_needwebhook_username` | `Need Bot` | Display name of the webhook in Discord |
 | `sm_needwebhook_avatar_url` | *(empty)* | Avatar URL for the webhook user |
 
