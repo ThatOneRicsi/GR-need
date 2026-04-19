@@ -41,6 +41,8 @@ ConVar gCvFooterText;
 
 float gNextAllowedUse = 0.0;
 bool gHasSteamWorks = false;
+bool gWebhookPending = false;
+int gPendingRequesterSerial = 0;
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int errMax)
 {
@@ -125,8 +127,18 @@ public Action Command_Need(int client, int args)
         return Plugin_Handled;
     }
 
-    char payload[4096];
-    BuildWebhookPayload(client, payload, sizeof(payload));
+    if (gWebhookPending)
+    {
+        ReplyToCommand(client, "[Need] A webhook request is already being sent. Please wait a moment.");
+        return Plugin_Handled;
+    }
+
+    char payload[16384];
+    if (!BuildWebhookPayload(client, payload, sizeof(payload)))
+    {
+        ReplyToCommand(client, "[Need] The webhook payload is too large or invalid. Reduce the configured message size.");
+        return Plugin_Handled;
+    }
 
     Handle request = SteamWorks_CreateHTTPRequest(k_EHTTPMethodPOST, webhookUrl);
     if (request == INVALID_HANDLE)
@@ -146,20 +158,12 @@ public Action Command_Need(int client, int args)
         return Plugin_Handled;
     }
 
-    gNextAllowedUse = now + gCvCooldownSeconds.FloatValue;
-
-    char announceText[192];
-    gCvAnnounceText.GetString(announceText, sizeof(announceText));
-    if (announceText[0] == '\0')
-    {
-        strcopy(announceText, sizeof(announceText), "Need message sent");
-    }
-
-    PrintToChatAll("%s", announceText);
+    gWebhookPending = true;
+    gPendingRequesterSerial = GetClientSerial(client);
     return Plugin_Handled;
 }
 
-void BuildWebhookPayload(int client, char[] buffer, int maxlen)
+bool BuildWebhookPayload(int client, char[] buffer, int maxlen)
 {
     int currentPlayers = GetRealPlayerCount();
     int maxPlayers = GetConfiguredMaxPlayers();
@@ -248,7 +252,7 @@ void BuildWebhookPayload(int client, char[] buffer, int maxlen)
         char escapedImageUrl[768];
         JsonEscape(imageUrl, escapedImageUrl, sizeof(escapedImageUrl));
 
-        FormatEx(
+        int written = FormatEx(
             buffer,
             maxlen,
             "{\"username\":\"%s\",\"avatar_url\":\"%s\",\"content\":\"%s\",\"embeds\":[{\"title\":\"%s\",\"description\":\"%s\",\"color\":%d,\"fields\":[{\"name\":\"%s\",\"value\":\"%s\",\"inline\":true},{\"name\":\"%s\",\"value\":\"%s\",\"inline\":true},{\"name\":\"%s\",\"value\":\"%s\",\"inline\":false},{\"name\":\"%s\",\"value\":\"%s\",\"inline\":false}],\"footer\":{\"text\":\"%s\"},\"image\":{\"url\":\"%s\"}}]}",
@@ -269,10 +273,10 @@ void BuildWebhookPayload(int client, char[] buffer, int maxlen)
             escapedFooterText,
             escapedImageUrl
         );
-        return;
+        return written > 0 && written < maxlen - 1;
     }
 
-    FormatEx(
+    int written = FormatEx(
         buffer,
         maxlen,
         "{\"username\":\"%s\",\"avatar_url\":\"%s\",\"content\":\"%s\",\"embeds\":[{\"title\":\"%s\",\"description\":\"%s\",\"color\":%d,\"fields\":[{\"name\":\"%s\",\"value\":\"%s\",\"inline\":true},{\"name\":\"%s\",\"value\":\"%s\",\"inline\":true},{\"name\":\"%s\",\"value\":\"%s\",\"inline\":false},{\"name\":\"%s\",\"value\":\"%s\",\"inline\":false}],\"footer\":{\"text\":\"%s\"}}]}",
@@ -292,6 +296,7 @@ void BuildWebhookPayload(int client, char[] buffer, int maxlen)
         escapedPlayerName,
         escapedFooterText
     );
+    return written > 0 && written < maxlen - 1;
 }
 
 void BuildMapImageUrl(const char[] mapName, char[] buffer, int maxlen)
@@ -406,9 +411,33 @@ int GetMaxHumanPlayersFromServer()
 
 public int OnWebhookCompleted(Handle request, bool failure, bool requestSuccessful, EHTTPStatusCode statusCode, any data)
 {
-    if (failure || !requestSuccessful || (statusCode != k_EHTTPStatusCode204NoContent && statusCode != k_EHTTPStatusCode200OK))
+    bool success = !failure && requestSuccessful && (statusCode == k_EHTTPStatusCode204NoContent || statusCode == k_EHTTPStatusCode200OK);
+    int requester = GetClientFromSerial(gPendingRequesterSerial);
+
+    gWebhookPending = false;
+    gPendingRequesterSerial = 0;
+
+    if (!success)
     {
         LogError("[Need] Discord webhook failed. failure=%d successful=%d status=%d", failure, requestSuccessful, statusCode);
+
+        if (requester > 0 && IsClientInGame(requester))
+        {
+            ReplyToCommand(requester, "[Need] Discord webhook failed. Please try again in a moment.");
+        }
+    }
+    else
+    {
+        gNextAllowedUse = GetEngineTime() + gCvCooldownSeconds.FloatValue;
+
+        char announceText[192];
+        gCvAnnounceText.GetString(announceText, sizeof(announceText));
+        if (announceText[0] == '\0')
+        {
+            strcopy(announceText, sizeof(announceText), "Need message sent");
+        }
+
+        PrintToChatAll("%s", announceText);
     }
 
     delete request;
@@ -464,7 +493,7 @@ void JsonEscape(const char[] input, char[] output, int maxlen)
 
     for (int i = 0; i < length && outPos < maxlen - 1; i++)
     {
-        char c = input[i];
+        int c = input[i];
 
         if (c == '"' || c == '\\')
         {
@@ -490,14 +519,77 @@ void JsonEscape(const char[] input, char[] output, int maxlen)
             continue;
         }
 
-        if (c == '\r' || c == '\t')
+        if (c == '\r')
         {
-            output[outPos++] = ' ';
+            if (outPos >= maxlen - 2)
+            {
+                break;
+            }
+
+            output[outPos++] = '\\';
+            output[outPos++] = 'r';
             continue;
         }
 
-        output[outPos++] = c;
+        if (c == '\t')
+        {
+            if (outPos >= maxlen - 2)
+            {
+                break;
+            }
+
+            output[outPos++] = '\\';
+            output[outPos++] = 't';
+            continue;
+        }
+
+        if (c == '\b')
+        {
+            if (outPos >= maxlen - 2)
+            {
+                break;
+            }
+
+            output[outPos++] = '\\';
+            output[outPos++] = 'b';
+            continue;
+        }
+
+        if (c == '\f')
+        {
+            if (outPos >= maxlen - 2)
+            {
+                break;
+            }
+
+            output[outPos++] = '\\';
+            output[outPos++] = 'f';
+            continue;
+        }
+
+        if (c >= 0 && c < 0x20)
+        {
+            if (outPos >= maxlen - 6)
+            {
+                break;
+            }
+
+            output[outPos++] = '\\';
+            output[outPos++] = 'u';
+            output[outPos++] = '0';
+            output[outPos++] = '0';
+            output[outPos++] = HexDigit((c >> 4) & 0x0F);
+            output[outPos++] = HexDigit(c & 0x0F);
+            continue;
+        }
+
+        output[outPos++] = view_as<char>(c);
     }
 
     output[outPos] = '\0';
+}
+
+char HexDigit(int value)
+{
+    return view_as<char>(value < 10 ? ('0' + value) : ('A' + value - 10));
 }
