@@ -1,276 +1,338 @@
-# GR !need - Discord Webhook Plugin
+# GR !need
+
+Discord webhook plugin for SourceMod that lets players use `!need` to post a configurable "we need more players" message to Discord.
 
 **Author:** ThatOneRicsi  
 **Version:** 1.0.1  
 **Website:** https://globalretake.com
 
-## Overview
+## What It Does
 
-GR !need is a SourceMod plugin that allows players to send a Discord webhook notification with the `!need` command. When players use this command, a rich Discord message is sent to a configured webhook URL containing server information, player count, map details, and other customizable content.
+When a player types `!need`, the plugin sends a Discord webhook with:
+
+- Plain text content for role pings or attention text
+- An embed with current player count, max players, mode, map, connect command, and requester name
+- Optional map image support
+- A global cooldown to stop server-wide spam
+
+The webhook is only treated as successful after Discord accepts it. Failed requests do not consume the cooldown.
 
 ## Features
 
-- Discord webhook integration
-- Player count in embeds
-- Map information and images
-- Template variables for customization
-- Cooldown to prevent spam
-- Customizable embed colors
-- Custom webhook username and avatar
-- Customizable embed fields and footer
+- Discord webhook support through the SourceMod `SteamWorks` extension
+- Rich embed formatting with configurable title, description, footer, and field labels
+- Template tokens such as `{CURRENT}`, `{MAX}`, `{MODE}`, `{MAP}`, `{CONNECT}`, and `{PLAYER}`
+- Optional map image URLs with prefix stripping support
+- Global cooldown between successful uses
+- Safer webhook flow with in-flight request protection
+- Safer payload handling for large messages and escaped characters
 
 ## Requirements
 
-- SourceMod 1.11 or later
-- **SteamWorks Extension** - This plugin requires the SteamWorks extension to send HTTP requests to Discord
+- SourceMod 1.11 or newer
+- SteamWorks extension installed on the server
+- A valid Discord webhook URL
+- Outbound network access from your server to Discord
 
-## Disclaimer
+## Included Files
 
-This plugin is primarily designed for Discord webhooks, though Discord alternatives that support webhooks may work. It is mainly developed for CS:GO, but other Source engine games may work as well.
+Repository layout:
+
+- `addons/sourcemod/plugins/need_webhook.smx`
+- `addons/sourcemod/scripting/need_webhook.sp`
+- `addons/sourcemod/scripting/include/steamworks.inc`
+- `cfg/sourcemod/need_webhook.cfg`
+
+Release zip files:
+
+- `GR_need_webhook_release_pasteable.zip`
+  Contains server-ready folder structure for direct extraction into the CS:GO server root.
+- `GR_need_webhook_release_with_source.zip`
+  Same folder structure plus `need_webhook.sp`.
+- `GR_need_webhook_release_flat.zip`
+  Contains `need_webhook.smx`, `need_webhook.cfg`, and `need_webhook.sp` in a flat layout with no folders.
 
 ## Installation
 
-1. **Extract the plugin files:**
-   - Copy `need_webhook.smx` to `addons/sourcemod/plugins/`
-   - Copy `need_webhook.cfg` to `cfg/sourcemod/`
+### Option 1: Use the pasteable release zip
 
-2. **Load the plugin:**
-   - Restart your server or run: `sm plugins load need_webhook`
+1. Extract `GR_need_webhook_release_pasteable.zip` into your server root.
+2. Restart the server or load the plugin manually.
+3. Edit `cfg/sourcemod/need_webhook.cfg`.
+4. Set `sm_needwebhook_url` to your Discord webhook.
 
-3. **Configure the webhook URL:**
-   - Edit `cfg/sourcemod/need_webhook.cfg` and set your Discord webhook URL:
-   ```
-   sm_needwebhook_url "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN"
-   ```
+### Option 2: Manual install
 
-### Compiling from source (optional)
+Copy these files:
 
-If you want to compile the plugin yourself:
+- `addons/sourcemod/plugins/need_webhook.smx` -> `addons/sourcemod/plugins/`
+- `cfg/sourcemod/need_webhook.cfg` -> `cfg/sourcemod/`
 
-1. Copy `need_webhook.sp` to `addons/sourcemod/scripting/`
-2. Run `./spcomp.exe need_webhook.sp`
-3. Copy the generated `need_webhook.smx` to `addons/sourcemod/plugins/`
+Optional source files:
 
-## Configuration
+- `addons/sourcemod/scripting/need_webhook.sp`
+- `addons/sourcemod/scripting/include/steamworks.inc`
 
-All configuration is done through ConVars in `cfg/sourcemod/need_webhook.cfg`:
+Then restart the server or run:
 
-### Core Settings
-
-| ConVar | Default | Description |
-|--------|---------|-------------|
-| `sm_needwebhook_url` | *(empty)* | **REQUIRED** - Your Discord webhook URL |
-| `sm_needwebhook_cooldown` | `1200` | Cooldown in seconds between `!need` uses (0 = no cooldown) |
-| `sm_needwebhook_announce` | `Need message sent` | In-game chat message after successful send |
-
-### Message Content
-
-| ConVar | Default | Description |
-|--------|---------|-------------|
-| `sm_needwebhook_message` | `Players needed! @everyone` | Plain text content in the Discord message (great for pings) |
-| `sm_needwebhook_username` | `Need Bot` | Display name of the webhook in Discord |
-| `sm_needwebhook_avatar_url` | *(empty)* | Avatar URL for the webhook user |
-
-### Embed Customization
-
-| ConVar | Default | Description |
-|--------|---------|-------------|
-| `sm_needwebhook_embed_title` | `{CURRENT}/{MAX} - {MODE}` | Embed title with template variables |
-| `sm_needwebhook_embed_description` | `{MAP}` | Embed description with template variables |
-| `sm_needwebhook_embed_color` | `#5865F2` | Embed color (supports decimal, #RRGGBB, or 0xRRGGBB) |
-| `sm_needwebhook_mode` | `Casual` | Game mode label for the {MODE} token |
-
-### Server Information
-
-| ConVar | Default | Description |
-|--------|---------|-------------|
-| `sm_needwebhook_connect` | `connect 127.0.0.1:27015` | Connection command text (replace with your server IP:port) |
-| `sm_needwebhook_max_players` | `0` | Max player count shown (0 = auto-detect) |
-
-### Embed Fields
-
-| ConVar | Default | Description |
-|--------|---------|-------------|
-| `sm_needwebhook_status_label` | `Status` | Field name for server status |
-| `sm_needwebhook_status_text` | `Active` | Field value for server status |
-| `sm_needwebhook_players_label` | `Players` | Field name for player count |
-| `sm_needwebhook_connect_label` | `Command to connect` | Field name for connection command |
-| `sm_needwebhook_requester_label` | `Needed by` | Field name for the player who used !need |
-| `sm_needwebhook_footer` | `IP: {CONNECT}` | Footer text with template variables |
-
-### Map Images
-
-| ConVar | Default | Description |
-|--------|---------|-------------|
-| `sm_needwebhook_image_base` | *(empty)* | Base URL for map images (e.g., `https://example.com/maps`) |
-| `sm_needwebhook_image_ext` | `jpg` | Image file extension (jpg, png, webp, etc.) |
-| `sm_needwebhook_image_include_prefix` | `1` | Include map prefixes (de_, cs_) in image URL (0 = strip them) |
-
-## Usage
-
-### Player Command
-
-Players use the following chat command on the server:
-
+```txt
+sm plugins load need_webhook
 ```
+
+## First-Time Setup
+
+Open `cfg/sourcemod/need_webhook.cfg` and configure at least:
+
+```txt
+sm_needwebhook_url "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN"
+sm_needwebhook_connect "connect YOUR_IP:YOUR_PORT"
+```
+
+Recommended values to review right away:
+
+- `sm_needwebhook_message`
+- `sm_needwebhook_mode`
+- `sm_needwebhook_max_players`
+- `sm_needwebhook_announce`
+- `sm_needwebhook_image_base`
+
+## Command
+
+Players use:
+
+```txt
 !need
 ```
 
-This sends a Discord message to the configured webhook and displays a confirmation message in-game.
+Internally this is the SourceMod command:
+
+```txt
+sm_need
+```
+
+## Behavior
 
 ### Cooldown
 
-- The cooldown timer is **global** - once a successful `!need` is used, no player can use it again until the cooldown expires
-- The cooldown is measured in seconds and resets after each successful use
-- Players attempting to use `!need` during cooldown will receive feedback on how many seconds remain
+- The cooldown is global, not per-player.
+- A successful `!need` blocks further `!need` usage for everyone until the cooldown expires.
+- Failed webhook sends do not start the cooldown.
 
-## Template Variables
+### Success and failure handling
 
-The following tokens can be used in template fields (embed title, description, footer):
+- The server only announces success after Discord returns a successful response.
+- If a webhook request is already in flight, new requests are temporarily blocked.
+- If Discord rejects the webhook, the requester gets an error message and can try again.
 
-| Token | Replaced With |
-|-------|----------------|
-| `{CURRENT}` | Current player count |
-| `{MAX}` | Maximum player count |
-| `{MODE}` | Game mode (from `sm_needwebhook_mode`) |
+## Configuration
+
+All settings are controlled through `cfg/sourcemod/need_webhook.cfg`.
+
+### Core
+
+| ConVar | Default | Description |
+|---|---|---|
+| `sm_needwebhook_url` | `(empty)` | Discord webhook URL. Required. |
+| `sm_needwebhook_cooldown` | `1200` | Global cooldown in seconds between successful uses. |
+| `sm_needwebhook_announce` | `Need message sent` | In-game text printed after a successful webhook. |
+
+### Webhook content
+
+| ConVar | Default | Description |
+|---|---|---|
+| `sm_needwebhook_message` | `Players needed! @EU server ping` | Plain text content outside the embed. Good for role or everyone pings. |
+| `sm_needwebhook_username` | `Need Bot` | Webhook display name override. |
+| `sm_needwebhook_avatar_url` | `(empty)` | Webhook avatar URL. Leave empty to use the webhook default. |
+
+### Embed templates
+
+| ConVar | Default | Description |
+|---|---|---|
+| `sm_needwebhook_embed_title` | `{CURRENT}/{MAX} - {MODE}` | Embed title template. |
+| `sm_needwebhook_embed_description` | `{MAP}\n{CONNECT}` | Embed description template. |
+| `sm_needwebhook_embed_color` | `#5865F2` | Embed color as decimal, `#RRGGBB`, or `0xRRGGBB`. |
+| `sm_needwebhook_mode` | `Casual` | Game mode label used by `{MODE}`. |
+
+### Server info
+
+| ConVar | Default | Description |
+|---|---|---|
+| `sm_needwebhook_connect` | `connect 127.0.0.1:27015` | Connect command shown in the embed. |
+| `sm_needwebhook_max_players` | `0` | Max players shown in the embed. `0` means auto-detect. |
+
+### Embed field labels and footer
+
+| ConVar | Default | Description |
+|---|---|---|
+| `sm_needwebhook_status_label` | `Status` | Field name for the status field. |
+| `sm_needwebhook_status_text` | `Active` | Field value for the status field. |
+| `sm_needwebhook_players_label` | `Players` | Field name for player count. |
+| `sm_needwebhook_connect_label` | `Command to connect` | Field name for the connect command. |
+| `sm_needwebhook_requester_label` | `Needed by` | Field name for the player who requested help. |
+| `sm_needwebhook_footer` | `IP: {CONNECT}` | Footer template. |
+
+### Map image options
+
+| ConVar | Default | Description |
+|---|---|---|
+| `sm_needwebhook_image_base` | `(empty)` | Base URL used for map images. |
+| `sm_needwebhook_image_ext` | `jpg` | File extension for map images. |
+| `sm_needwebhook_image_include_prefix` | `1` | Keep map prefixes like `de_` and `cs_` when building the image URL. |
+
+## Template Tokens
+
+These tokens can be used in title, description, and footer templates:
+
+| Token | Value |
+|---|---|
+| `{CURRENT}` | Current real human player count |
+| `{MAX}` | Configured or detected max player count |
+| `{MODE}` | Value of `sm_needwebhook_mode` |
 | `{MAP}` | Current map name |
-| `{CONNECT}` | Connection command |
-| `{PLAYER}` | Name of the player who used !need |
+| `{CONNECT}` | Value of `sm_needwebhook_connect` |
+| `{PLAYER}` | Name of the player who used `!need` |
 
-**Example Template:**
+Example:
+
+```txt
+sm_needwebhook_embed_title "{CURRENT}/{MAX} - {MODE}"
+sm_needwebhook_embed_description "{MAP}\n{CONNECT}"
+sm_needwebhook_footer "Requested by {PLAYER}"
 ```
-sm_needwebhook_embed_title "🔥 {CURRENT}/{MAX} players needed on {MAP}!"
-sm_needwebhook_embed_description "{MODE} Mode - {PLAYER} needs you!"
-sm_needwebhook_footer "Connect: {CONNECT}"
+
+## Map Images
+
+If `sm_needwebhook_image_base` is set, the plugin appends the current map name and extension to build the image URL.
+
+Examples:
+
+```txt
+sm_needwebhook_image_base "https://example.com/maps"
+sm_needwebhook_image_ext "jpg"
+sm_needwebhook_image_include_prefix "1"
 ```
 
-## Map Image Configuration
+With `de_dust2`:
 
-To display map images in your Discord messages:
+- Prefix kept: `https://example.com/maps/de_dust2.jpg`
+- Prefix stripped: `https://example.com/maps/dust2.jpg`
 
-1. **Prepare Your Images:**
-   - Create a web-accessible directory for map images
-   - Image files should be named according to map names with optional prefixes
-   - Examples: `dust2.jpg`, `de_mirage.jpg`, `cs_office.jpg`
+## Example Configurations
 
-2. **Configure the Base URL:**
-   ```
-   sm_needwebhook_image_base "https://example.com/maps"
-   sm_needwebhook_image_ext "jpg"
-   sm_needwebhook_image_include_prefix "1"
-   ```
+### Basic
 
-3. **How Image URLs are Built:**
-   - With `image_include_prefix = 1`: `https://example.com/maps/de_dust2.jpg`
-   - With `image_include_prefix = 0` (strips de_): `https://example.com/maps/dust2.jpg`
-
-## Discord Webhook Setup
-
-### Creating a Webhook
-
-1. Open your Discord server settings
-2. Navigate to **Integrations** > **Webhooks**
-3. Click **New Webhook**
-4. Configure the webhook:
-   - **Name:** Choose any name (e.g., "Server Notifications")
-   - **Channel:** Select the channel where `!need` messages should appear
-   - **Avatar** (optional): Upload a custom avatar
-5. Click **Copy Webhook URL**
-6. Paste the URL into your config file
-
-### Webhook Permissions
-
-Ensure the webhook has permission to send messages in the target channel.
-
-## Configuration Examples
-
-### Basic Setup
-Add these lines to `cfg/sourcemod/need_webhook.cfg`:
-
-```
+```txt
 sm_needwebhook_url "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN"
-sm_needwebhook_connect "connect 127.0.0.1:27015"
+sm_needwebhook_connect "connect 203.0.113.10:27015"
 ```
 
-This gives you a working setup with default embed formatting.
+### Ping a role
 
-### Custom Message with Ping
-To send a custom message that pings a role:
-
-```
+```txt
 sm_needwebhook_message "@everyone Server needs players!"
-sm_needwebhook_embed_title "{CURRENT}/{MAX} - Help needed!"
+sm_needwebhook_embed_title "{CURRENT}/{MAX} - Help needed"
 ```
 
-### Map Images
-To show map screenshots in Discord:
+### Competitive server
 
+```txt
+sm_needwebhook_mode "Competitive"
+sm_needwebhook_status_text "Matchmaking"
+sm_needwebhook_cooldown "300"
+sm_needwebhook_embed_title "{CURRENT}/{MAX} - {MODE}"
 ```
+
+### Map screenshots
+
+```txt
 sm_needwebhook_image_base "https://example.com/maps"
 sm_needwebhook_image_ext "jpg"
 sm_needwebhook_image_include_prefix "0"
 ```
 
-This will display images like `https://example.com/maps/dust2.jpg` for the current map.
+## Compiling From Source
 
-### Custom Embed Styling
-For a more detailed embed:
+You need:
 
-```
-sm_needwebhook_embed_title "🔥 {CURRENT}/{MAX} players needed!"
-sm_needwebhook_embed_description "Map: {MAP}\nMode: {MODE}\nRequested by: {PLAYER}"
-sm_needwebhook_embed_color "#ff0000"
-sm_needwebhook_footer "Join now: {CONNECT}"
-```
+- `need_webhook.sp`
+- `steamworks.inc`
+- a SourceMod compiler such as `spcomp.exe`
 
-### Disable Cooldown
-To allow unlimited `!need` commands:
+Example:
 
-```
-sm_needwebhook_cooldown "0"
+```txt
+spcomp.exe addons/sourcemod/scripting/need_webhook.sp
 ```
 
-### Competitive Server Setup
-For a competitive server:
-
-```
-sm_needwebhook_mode "Competitive"
-sm_needwebhook_embed_title "{CURRENT}/{MAX} - {MODE} Match"
-sm_needwebhook_status_text "Matchmaking"
-sm_needwebhook_cooldown "300"
-```
+This repository already includes `addons/sourcemod/scripting/include/steamworks.inc` so local recompiles are easier.
 
 ## Troubleshooting
 
-### Plugin Fails to Load
-- **Cause:** SteamWorks extension is not installed
-- **Solution:** Install the SteamWorks extension for SourceMod
+### Plugin says SteamWorks is required
 
-### Command Shows "Webhook URL is not configured"
-- **Cause:** `sm_needwebhook_url` is empty
-- **Solution:** Set your Discord webhook URL in `cfg/sourcemod/need_webhook.cfg`
+Cause:
+The SteamWorks extension is not installed or not loaded.
 
-### Messages Don't Appear in Discord
-- **Cause:** Webhook URL is incorrect or Discord API is unreachable
-- **Solution:** Verify your webhook URL is correct and the webhook exists
+Fix:
+Install a compatible SteamWorks extension for your SourceMod version and game.
 
-### "Please wait X more seconds" Message
-- **Cause:** Cooldown timer hasn't expired
-- **Solution:** Wait for the cooldown period to end
+### `!need` says the webhook URL is not configured
 
-### Maps Not Appearing as Images
-- **Cause:** Base URL is empty or incorrect, image files don't exist
-- **Solution:** Set `sm_needwebhook_image_base` correctly and ensure image files exist
+Cause:
+`sm_needwebhook_url` is empty or still set to the placeholder value.
 
-### Special Characters Display Incorrectly in Discord
-- **Cause:** JSON escaping issues
-- **Solution:** The plugin automatically escapes special characters
+Fix:
+Set the real Discord webhook URL in `cfg/sourcemod/need_webhook.cfg`.
+
+### Nothing appears in Discord
+
+Cause:
+
+- Bad webhook URL
+- Discord webhook deleted
+- Server cannot reach Discord
+- Discord rejected the payload
+
+Fix:
+
+- Re-copy the webhook URL
+- Test server outbound connectivity
+- Check SourceMod error logs
+- Keep embed text shorter if you heavily customized the message
+
+### Players get a failure message instead of a success message
+
+Cause:
+Discord rejected the request or the request failed in transit.
+
+Fix:
+Check the server logs and validate the webhook URL and payload content.
+
+### A player sees "A webhook request is already being sent"
+
+Cause:
+Another `!need` request is currently in progress.
+
+Fix:
+Wait a moment and try again.
+
+### Map image does not show
+
+Cause:
+
+- `sm_needwebhook_image_base` is empty
+- Wrong image URL or extension
+- Image file does not exist at the expected path
+
+Fix:
+Confirm the final generated URL is valid in a browser.
+
+## Notes
+
+- Designed mainly for CS:GO / Source engine servers.
+- Other SourceMod-supported games may also work.
+- This plugin depends on Discord-style webhooks and is primarily intended for Discord.
 
 ## License
 
-This plugin is licensed under the MIT License. You are free to use, modify, and distribute it as you wish.
-
----
-
-**Compatible SourceMod Version:** 1.11+  
-**Dependencies:** SteamWorks Extension
+This project is licensed under the MIT License.
