@@ -1,306 +1,276 @@
-# GR !need
-
-Discord webhook plugin for SourceMod that lets players use `!need` to post a configurable "we need more players" message to Discord.
+# GR !need - Discord Webhook Plugin
 
 **Author:** ThatOneRicsi  
-**Version:** 1.1.0  
+**Version:** 1.0.1  
 **Website:** https://globalretake.com
 
-## What It Does
+## Overview
 
-When a player types `!need`, the plugin sends a Discord webhook with:
-
-- Optional ping text separate from the main message text
-- An embed with current player count, max players, mode, map, connect command, requester name, server name, and optional tag
-- Optional map image support
-- A global cooldown to stop server-wide spam
-
-The plugin can also:
-
-- Send a non-ping webhook when the map changes
-- Edit the last webhook message as players join or leave
-- Mark the server status inactive when no real players remain
-
-The cooldown is only consumed after Discord accepts the `!need` webhook. Failed requests do not consume the cooldown.
+GR !need is a SourceMod plugin that allows players to send a Discord webhook notification with the `!need` command. When players use this command, a rich Discord message is sent to a configured webhook URL containing server information, player count, map details, and other customizable content.
 
 ## Features
 
-- Discord webhook support through the SourceMod `SteamWorks` extension
-- Rich embed formatting with configurable title, description, footer, and field labels
-- Automatic or custom game mode labels
-- Configurable server name and optional tag field
-- Separate ping text for `!need` plus a dedicated map-change message without pinging
-- Last-message tracking with webhook edits for live player count and status updates
-- Template tokens such as `{CURRENT}`, `{MAX}`, `{MODE}`, `{MAP}`, `{CONNECT}`, `{PLAYER}`, `{SERVER}`, and `{TAG}`
-- Optional map image URLs with prefix stripping support
-- Safer webhook flow with in-flight request protection
-- Safer payload handling for large messages and escaped characters
+- Discord webhook integration
+- Player count in embeds
+- Map information and images
+- Template variables for customization
+- Cooldown to prevent spam
+- Customizable embed colors
+- Custom webhook username and avatar
+- Customizable embed fields and footer
 
 ## Requirements
 
-- SourceMod 1.11 or newer
-- SteamWorks extension installed on the server
-- A valid Discord webhook URL
-- Outbound network access from your server to Discord
+- SourceMod 1.11 or later
+- **SteamWorks Extension** - This plugin requires the SteamWorks extension to send HTTP requests to Discord
 
-## Included Files
+## Disclaimer
 
-- `addons/sourcemod/plugins/need_webhook.smx`
-- `addons/sourcemod/scripting/need_webhook.sp`
-- `addons/sourcemod/scripting/include/steamworks.inc`
-- `cfg/sourcemod/need_webhook.cfg`
+This plugin is primarily designed for Discord webhooks, though Discord alternatives that support webhooks may work. It is mainly developed for CS:GO, but other Source engine games may work as well.
 
 ## Installation
 
-1. Copy `need_webhook.smx` into `addons/sourcemod/plugins/`.
-2. Copy `cfg/sourcemod/need_webhook.cfg` into `cfg/sourcemod/`.
-3. Restart the server or run `sm plugins load need_webhook`.
-4. Set `sm_needwebhook_url` in the config.
+1. **Extract the plugin files:**
+   - Copy `need_webhook.smx` to `addons/sourcemod/plugins/`
+   - Copy `need_webhook.cfg` to `cfg/sourcemod/`
 
-Optional source files for recompiling:
+2. **Load the plugin:**
+   - Restart your server or run: `sm plugins load need_webhook`
 
-- `addons/sourcemod/scripting/need_webhook.sp`
-- `addons/sourcemod/scripting/include/steamworks.inc`
+3. **Configure the webhook URL:**
+   - Edit `cfg/sourcemod/need_webhook.cfg` and set your Discord webhook URL:
+   ```
+   sm_needwebhook_url "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN"
+   ```
 
-## First-Time Setup
+### Compiling from source (optional)
 
-At minimum, configure:
+If you want to compile the plugin yourself:
 
-```txt
-sm_needwebhook_url "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN"
-sm_needwebhook_connect "connect YOUR_IP:YOUR_PORT"
-```
-
-Good next settings to review:
-
-- `sm_needwebhook_ping`
-- `sm_needwebhook_message`
-- `sm_needwebhook_mode_source`
-- `sm_needwebhook_server_name`
-- `sm_needwebhook_tag`
-- `sm_needwebhook_mapchange_enabled`
-- `sm_needwebhook_status_updates`
-
-## Command
-
-Players use:
-
-```txt
-!need
-```
-
-Internally this is the SourceMod command:
-
-```txt
-sm_need
-```
-
-## Behavior
-
-### Cooldown
-
-- The cooldown is global, not per-player.
-- A successful `!need` blocks further `!need` usage for everyone until the cooldown expires.
-- Failed `!need` webhook sends do not start the cooldown.
-
-### Success and failure handling
-
-- The server only announces success after Discord returns a successful response.
-- If a webhook request is already in flight, new requests are temporarily blocked.
-- If Discord rejects the webhook, the requester gets an error message and can try again.
-
-### Map change and live updates
-
-- When enabled, a map change posts a separate webhook without ping text.
-- The plugin stores the last message ID returned by Discord.
-- When players join or leave, the plugin can edit that last message to keep `Players` and `Status` current.
-- When the server empties out, status changes from the active text to the inactive text.
+1. Copy `need_webhook.sp` to `addons/sourcemod/scripting/`
+2. Run `./spcomp.exe need_webhook.sp`
+3. Copy the generated `need_webhook.smx` to `addons/sourcemod/plugins/`
 
 ## Configuration
 
-All settings are controlled through `cfg/sourcemod/need_webhook.cfg`.
+All configuration is done through ConVars in `cfg/sourcemod/need_webhook.cfg`:
 
-### Core
-
-| ConVar | Default | Description |
-|---|---|---|
-| `sm_needwebhook_url` | `(empty)` | Discord webhook URL. Required. |
-| `sm_needwebhook_cooldown` | `1200` | Global cooldown in seconds between successful `!need` uses. |
-| `sm_needwebhook_announce` | `Need message sent` | In-game text printed after a successful `!need`. |
-
-### Webhook content
+### Core Settings
 
 | ConVar | Default | Description |
-|---|---|---|
-| `sm_needwebhook_ping` | `@everyone` | Optional ping text placed above the normal `!need` message. |
-| `sm_needwebhook_message` | `Players needed!` | Plain text content for `!need`. |
-| `sm_needwebhook_mapchange_enabled` | `1` | Send a webhook when the map changes. |
-| `sm_needwebhook_mapchange_message` | `Map changed to {MAP}` | Plain text content for map-change messages. |
-| `sm_needwebhook_username` | `Need Bot` | Webhook display name override. |
-| `sm_needwebhook_avatar_url` | `(empty)` | Webhook avatar URL. Leave empty to use the webhook default. |
+|--------|---------|-------------|
+| `sm_needwebhook_url` | *(empty)* | **REQUIRED** - Your Discord webhook URL |
+| `sm_needwebhook_cooldown` | `1200` | Cooldown in seconds between `!need` uses (0 = no cooldown) |
+| `sm_needwebhook_announce` | `Need message sent` | In-game chat message after successful send |
 
-### Embed templates and mode
+### Message Content
 
 | ConVar | Default | Description |
-|---|---|---|
-| `sm_needwebhook_embed_title` | `{CURRENT}/{MAX} - {MODE}` | Embed title template. |
-| `sm_needwebhook_embed_description` | `{MAP}\n{CONNECT}` | Embed description template. |
-| `sm_needwebhook_embed_color` | `#5865F2` | Embed color as decimal, `#RRGGBB`, or `0xRRGGBB`. |
-| `sm_needwebhook_mode_source` | `auto` | Use `auto` to detect the game mode or `custom` to force `sm_needwebhook_mode`. |
-| `sm_needwebhook_mode` | `Casual` | Custom fallback mode label used when auto detection is disabled or unavailable. |
+|--------|---------|-------------|
+| `sm_needwebhook_message` | `Players needed! @everyone` | Plain text content in the Discord message (great for pings) |
+| `sm_needwebhook_username` | `Need Bot` | Display name of the webhook in Discord |
+| `sm_needwebhook_avatar_url` | *(empty)* | Avatar URL for the webhook user |
 
-### Server info
+### Embed Customization
 
 | ConVar | Default | Description |
-|---|---|---|
-| `sm_needwebhook_connect` | `connect 127.0.0.1:27015` | Connect command shown in the embed. |
-| `sm_needwebhook_max_players` | `0` | Max players shown in the embed. `0` means auto-detect. |
-| `sm_needwebhook_server_name` | `(hostname)` | Server name field. Leave empty to use the server hostname. |
-| `sm_needwebhook_server_name_label` | `Server` | Field label for the server name. |
-| `sm_needwebhook_tag` | `(empty)` | Optional extra tag such as `Official` or `Verified`. |
-| `sm_needwebhook_tag_label` | `Tag` | Field label for the extra tag. |
+|--------|---------|-------------|
+| `sm_needwebhook_embed_title` | `{CURRENT}/{MAX} - {MODE}` | Embed title with template variables |
+| `sm_needwebhook_embed_description` | `{MAP}` | Embed description with template variables |
+| `sm_needwebhook_embed_color` | `#5865F2` | Embed color (supports decimal, #RRGGBB, or 0xRRGGBB) |
+| `sm_needwebhook_mode` | `Casual` | Game mode label for the {MODE} token |
 
-### Status and live updates
+### Server Information
 
 | ConVar | Default | Description |
-|---|---|---|
-| `sm_needwebhook_status_label` | `Status` | Field name for the status field. |
-| `sm_needwebhook_status_text` | `Active` | Status text used while real players are online. |
-| `sm_needwebhook_inactive_status_text` | `Inactive` | Status text used when the server has no real players online. |
-| `sm_needwebhook_status_updates` | `1` | Edit the last webhook message when player counts change. |
-| `sm_needwebhook_status_update_delay` | `3.0` | Debounce delay before sending a status/player-count edit. |
-| `sm_needwebhook_players_label` | `Players` | Field name for player count. |
-| `sm_needwebhook_connect_label` | `Command to connect` | Field name for the connect command. |
-| `sm_needwebhook_requester_label` | `Needed by` | Field name for the player who requested help. |
-| `sm_needwebhook_footer` | `IP: {CONNECT}` | Footer template. |
+|--------|---------|-------------|
+| `sm_needwebhook_connect` | `connect 127.0.0.1:27015` | Connection command text (replace with your server IP:port) |
+| `sm_needwebhook_max_players` | `0` | Max player count shown (0 = auto-detect) |
 
-### Map image options
+### Embed Fields
 
 | ConVar | Default | Description |
-|---|---|---|
-| `sm_needwebhook_image_base` | `(empty)` | Base URL used for map images. |
-| `sm_needwebhook_image_ext` | `jpg` | File extension for map images. |
-| `sm_needwebhook_image_include_prefix` | `1` | Keep map prefixes like `de_` and `cs_` when building the image URL. |
+|--------|---------|-------------|
+| `sm_needwebhook_status_label` | `Status` | Field name for server status |
+| `sm_needwebhook_status_text` | `Active` | Field value for server status |
+| `sm_needwebhook_players_label` | `Players` | Field name for player count |
+| `sm_needwebhook_connect_label` | `Command to connect` | Field name for connection command |
+| `sm_needwebhook_requester_label` | `Needed by` | Field name for the player who used !need |
+| `sm_needwebhook_footer` | `IP: {CONNECT}` | Footer text with template variables |
 
-## Template Tokens
+### Map Images
 
-These tokens can be used in plain content, title, description, and footer templates:
+| ConVar | Default | Description |
+|--------|---------|-------------|
+| `sm_needwebhook_image_base` | *(empty)* | Base URL for map images (e.g., `https://example.com/maps`) |
+| `sm_needwebhook_image_ext` | `jpg` | Image file extension (jpg, png, webp, etc.) |
+| `sm_needwebhook_image_include_prefix` | `1` | Include map prefixes (de_, cs_) in image URL (0 = strip them) |
 
-| Token | Value |
-|---|---|
-| `{CURRENT}` | Current real human player count |
-| `{MAX}` | Configured or detected max player count |
-| `{MODE}` | Detected or custom game mode label |
+## Usage
+
+### Player Command
+
+Players use the following chat command on the server:
+
+```
+!need
+```
+
+This sends a Discord message to the configured webhook and displays a confirmation message in-game.
+
+### Cooldown
+
+- The cooldown timer is **global** - once a successful `!need` is used, no player can use it again until the cooldown expires
+- The cooldown is measured in seconds and resets after each successful use
+- Players attempting to use `!need` during cooldown will receive feedback on how many seconds remain
+
+## Template Variables
+
+The following tokens can be used in template fields (embed title, description, footer):
+
+| Token | Replaced With |
+|-------|----------------|
+| `{CURRENT}` | Current player count |
+| `{MAX}` | Maximum player count |
+| `{MODE}` | Game mode (from `sm_needwebhook_mode`) |
 | `{MAP}` | Current map name |
-| `{CONNECT}` | Value of `sm_needwebhook_connect` |
-| `{PLAYER}` | Name of the player who used `!need` |
-| `{SERVER}` | Configured server name or hostname |
-| `{TAG}` | Optional configured tag |
+| `{CONNECT}` | Connection command |
+| `{PLAYER}` | Name of the player who used !need |
 
-Example:
-
-```txt
-sm_needwebhook_ping "@everyone"
-sm_needwebhook_message "{SERVER} needs players for {MODE}"
-sm_needwebhook_embed_title "{SERVER} - {CURRENT}/{MAX}"
-sm_needwebhook_footer "Requested by {PLAYER}"
+**Example Template:**
+```
+sm_needwebhook_embed_title "🔥 {CURRENT}/{MAX} players needed on {MAP}!"
+sm_needwebhook_embed_description "{MODE} Mode - {PLAYER} needs you!"
+sm_needwebhook_footer "Connect: {CONNECT}"
 ```
 
-## Example Configurations
+## Map Image Configuration
 
-### Competitive server with auto mode
+To display map images in your Discord messages:
 
-```txt
-sm_needwebhook_mode_source "auto"
-sm_needwebhook_server_name "Global Retake EU #1"
-sm_needwebhook_tag "Official"
-sm_needwebhook_ping "@competitive"
-sm_needwebhook_message "Need more players on {SERVER}"
+1. **Prepare Your Images:**
+   - Create a web-accessible directory for map images
+   - Image files should be named according to map names with optional prefixes
+   - Examples: `dust2.jpg`, `de_mirage.jpg`, `cs_office.jpg`
+
+2. **Configure the Base URL:**
+   ```
+   sm_needwebhook_image_base "https://example.com/maps"
+   sm_needwebhook_image_ext "jpg"
+   sm_needwebhook_image_include_prefix "1"
+   ```
+
+3. **How Image URLs are Built:**
+   - With `image_include_prefix = 1`: `https://example.com/maps/de_dust2.jpg`
+   - With `image_include_prefix = 0` (strips de_): `https://example.com/maps/dust2.jpg`
+
+## Discord Webhook Setup
+
+### Creating a Webhook
+
+1. Open your Discord server settings
+2. Navigate to **Integrations** > **Webhooks**
+3. Click **New Webhook**
+4. Configure the webhook:
+   - **Name:** Choose any name (e.g., "Server Notifications")
+   - **Channel:** Select the channel where `!need` messages should appear
+   - **Avatar** (optional): Upload a custom avatar
+5. Click **Copy Webhook URL**
+6. Paste the URL into your config file
+
+### Webhook Permissions
+
+Ensure the webhook has permission to send messages in the target channel.
+
+## Configuration Examples
+
+### Basic Setup
+Add these lines to `cfg/sourcemod/need_webhook.cfg`:
+
+```
+sm_needwebhook_url "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN"
+sm_needwebhook_connect "connect 127.0.0.1:27015"
 ```
 
-### Custom fallback mode
+This gives you a working setup with default embed formatting.
 
-```txt
-sm_needwebhook_mode_source "custom"
-sm_needwebhook_mode "Wingman"
+### Custom Message with Ping
+To send a custom message that pings a role:
+
+```
+sm_needwebhook_message "@everyone Server needs players!"
+sm_needwebhook_embed_title "{CURRENT}/{MAX} - Help needed!"
 ```
 
-### Map-change posts without pinging
+### Map Images
+To show map screenshots in Discord:
 
-```txt
-sm_needwebhook_mapchange_enabled "1"
-sm_needwebhook_mapchange_message "{SERVER} switched to {MAP}"
-sm_needwebhook_ping "@everyone"
 ```
-
-### Live status updates
-
-```txt
-sm_needwebhook_status_updates "1"
-sm_needwebhook_status_text "Active"
-sm_needwebhook_inactive_status_text "Inactive"
-sm_needwebhook_status_update_delay "3.0"
-```
-
-### Map screenshots
-
-```txt
 sm_needwebhook_image_base "https://example.com/maps"
 sm_needwebhook_image_ext "jpg"
 sm_needwebhook_image_include_prefix "0"
 ```
 
-## Compiling From Source
+This will display images like `https://example.com/maps/dust2.jpg` for the current map.
 
-You need:
+### Custom Embed Styling
+For a more detailed embed:
 
-- `need_webhook.sp`
-- `steamworks.inc`
-- a SourceMod compiler such as `spcomp.exe`
+```
+sm_needwebhook_embed_title "🔥 {CURRENT}/{MAX} players needed!"
+sm_needwebhook_embed_description "Map: {MAP}\nMode: {MODE}\nRequested by: {PLAYER}"
+sm_needwebhook_embed_color "#ff0000"
+sm_needwebhook_footer "Join now: {CONNECT}"
+```
 
-Example:
+### Disable Cooldown
+To allow unlimited `!need` commands:
 
-```txt
-spcomp.exe addons/sourcemod/scripting/need_webhook.sp
+```
+sm_needwebhook_cooldown "0"
+```
+
+### Competitive Server Setup
+For a competitive server:
+
+```
+sm_needwebhook_mode "Competitive"
+sm_needwebhook_embed_title "{CURRENT}/{MAX} - {MODE} Match"
+sm_needwebhook_status_text "Matchmaking"
+sm_needwebhook_cooldown "300"
 ```
 
 ## Troubleshooting
 
-### Plugin says SteamWorks is required
+### Plugin Fails to Load
+- **Cause:** SteamWorks extension is not installed
+- **Solution:** Install the SteamWorks extension for SourceMod
 
-Install a compatible SteamWorks extension for your SourceMod version and game.
+### Command Shows "Webhook URL is not configured"
+- **Cause:** `sm_needwebhook_url` is empty
+- **Solution:** Set your Discord webhook URL in `cfg/sourcemod/need_webhook.cfg`
 
-### `!need` says the webhook URL is not configured
+### Messages Don't Appear in Discord
+- **Cause:** Webhook URL is incorrect or Discord API is unreachable
+- **Solution:** Verify your webhook URL is correct and the webhook exists
 
-Set the real Discord webhook URL in `cfg/sourcemod/need_webhook.cfg`.
+### "Please wait X more seconds" Message
+- **Cause:** Cooldown timer hasn't expired
+- **Solution:** Wait for the cooldown period to end
 
-### Nothing appears in Discord
+### Maps Not Appearing as Images
+- **Cause:** Base URL is empty or incorrect, image files don't exist
+- **Solution:** Set `sm_needwebhook_image_base` correctly and ensure image files exist
 
-Check:
-
-- The webhook URL is still valid
-- The server can reach Discord
-- SourceMod error logs for failed HTTP requests
-- Your payload size if you heavily customized the message
-
-### The player count or status is not updating
-
-Check:
-
-- `sm_needwebhook_status_updates` is enabled
-- A plugin message has already been sent and stored as the last message
-- The webhook URL still has permission to edit its own messages
-
-### Map image does not show
-
-Confirm the final generated image URL is valid in a browser.
-
-## Notes
-
-- Designed mainly for CS:GO / Source engine servers.
-- Other SourceMod-supported games may also work.
-- This plugin depends on Discord-style webhooks and is primarily intended for Discord.
+### Special Characters Display Incorrectly in Discord
+- **Cause:** JSON escaping issues
+- **Solution:** The plugin automatically escapes special characters
 
 ## License
 
-This project is licensed under the MIT License.
+This plugin is licensed under the MIT License. You are free to use, modify, and distribute it as you wish.
+
+---
+
+**Compatible SourceMod Version:** 1.11+  
+**Dependencies:** SteamWorks Extension
