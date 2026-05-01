@@ -1,7 +1,7 @@
 # GR !need - Discord Webhook Plugin
 
 **Author:** ThatOneRicsi  
-**Version:** 1.0.1  
+**Version:** 1.0.2  
 **Website:** https://globalretake.com
 
 ## Overview

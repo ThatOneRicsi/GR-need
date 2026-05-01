@@ -6,7 +6,7 @@
 #undef REQUIRE_EXTENSIONS
 #include <steamworks>
 
-#define PLUGIN_VERSION "1.0.2"
+#define PLUGIN_VERSION "1.0.1"
 #define WEBHOOK_TIMEOUT_SECONDS 20.0
 #define WEBHOOK_TIMEOUT_MS 20000
 
