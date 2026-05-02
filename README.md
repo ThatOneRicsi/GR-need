@@ -1,7 +1,7 @@
 # GR !need - Discord Webhook Plugin
 
 **Author:** ThatOneRicsi  
-**Version:** 1.0.2  
+**Version:** 1.0.4  
 **Website:** https://globalretake.com
 
 ## Overview
@@ -15,6 +15,8 @@ GR !need is a SourceMod plugin that allows players to send a Discord webhook not
 - Map information and images
 - Template variables for customization
 - Cooldown to prevent spam
+- Failure cooldown to prevent retry spam
+- Requester-only or global in-game confirmation messages
 - Customizable embed colors
 - Custom webhook username and avatar
 - Customizable embed fields and footer
@@ -61,7 +63,9 @@ All configuration is done through ConVars in `cfg/sourcemod/need_webhook.cfg`:
 |--------|---------|-------------|
 | `sm_needwebhook_url` | *(empty)* | **REQUIRED** - Your Discord webhook URL |
 | `sm_needwebhook_cooldown` | `1200` | Cooldown in seconds between `!need` uses (0 = no cooldown) |
+| `sm_needwebhook_failure_cooldown` | `60` | Cooldown after a failed or timed out send attempt |
 | `sm_needwebhook_announce` | `Need message sent` | In-game chat message after successful send |
+| `sm_needwebhook_announce_mode` | `1` | Who sees the confirmation: `0` disabled, `1` requester only, `2` everyone |
 
 ### Message Content
 
@@ -76,7 +80,7 @@ All configuration is done through ConVars in `cfg/sourcemod/need_webhook.cfg`:
 | ConVar | Default | Description |
 |--------|---------|-------------|
 | `sm_needwebhook_embed_title` | `{CURRENT}/{MAX} - {MODE}` | Embed title with template variables |
-| `sm_needwebhook_embed_description` | `{MAP}` | Embed description with template variables |
+| `sm_needwebhook_embed_description` | `{MAP}\n{CONNECT}` | Embed description with template variables |
 | `sm_needwebhook_embed_color` | `#5865F2` | Embed color (supports decimal, #RRGGBB, or 0xRRGGBB) |
 | `sm_needwebhook_mode` | `Casual` | Game mode label for the {MODE} token |
 
@@ -116,13 +120,14 @@ Players use the following chat command on the server:
 !need
 ```
 
-This sends a Discord message to the configured webhook and displays a confirmation message in-game.
+This sends a Discord message to the configured webhook and displays a confirmation message in-game once the request is handed off successfully.
 
 ### Cooldown
 
 - The cooldown timer is **global** - once a successful `!need` is used, no player can use it again until the cooldown expires
 - The cooldown is measured in seconds and resets after each successful use
 - Players attempting to use `!need` during cooldown will receive feedback on how many seconds remain
+- Failed or timed out webhook attempts can also trigger a separate failure cooldown to stop retry spam
 
 ## Template Variables
 
@@ -253,6 +258,10 @@ sm_needwebhook_cooldown "300"
 ### Messages Don't Appear in Discord
 - **Cause:** Webhook URL is incorrect or Discord API is unreachable
 - **Solution:** Verify your webhook URL is correct and the webhook exists
+
+### Message Appears In Discord But The Server Stays Stuck
+- **Cause:** An older build is still waiting on the async callback before clearing the pending state
+- **Solution:** Update to version `1.0.4` or later, which clears the pending state immediately after a successful HTTP handoff
 
 ### "Please wait X more seconds" Message
 - **Cause:** Cooldown timer hasn't expired

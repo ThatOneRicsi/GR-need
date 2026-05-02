@@ -6,7 +6,7 @@
 #undef REQUIRE_EXTENSIONS
 #include <steamworks>
 
-#define PLUGIN_VERSION "1.0.2"
+#define PLUGIN_VERSION "1.0.4"
 #define WEBHOOK_TIMEOUT_SECONDS 20.0
 #define WEBHOOK_TIMEOUT_MS 20000
 
@@ -20,6 +20,7 @@ public Plugin myinfo =
 };
 
 ConVar gCvCooldownSeconds;
+ConVar gCvFailureCooldownSeconds;
 ConVar gCvWebhookUrl;
 ConVar gCvModeLabel;
 ConVar gCvPlainContent;
@@ -27,6 +28,7 @@ ConVar gCvImageBaseUrl;
 ConVar gCvImageExtension;
 ConVar gCvImageIncludePrefix;
 ConVar gCvAnnounceText;
+ConVar gCvAnnounceMode;
 ConVar gCvUsername;
 ConVar gCvAvatarUrl;
 ConVar gCvEmbedTitle;
@@ -44,7 +46,6 @@ ConVar gCvFooterText;
 float gNextAllowedUse = 0.0;
 bool gHasSteamWorks = false;
 bool gWebhookPending = false;
-int gPendingRequesterSerial = 0;
 Handle gPendingWebhookRequest = INVALID_HANDLE;
 Handle gWebhookTimeoutTimer = null;
 
@@ -59,6 +60,7 @@ public void OnPluginStart()
 
     CreateConVar("sm_needwebhook_version", PLUGIN_VERSION, "Need Webhook plugin version.", FCVAR_NOTIFY | FCVAR_DONTRECORD);
     gCvCooldownSeconds = CreateConVar("sm_needwebhook_cooldown", "1200", "Cooldown in seconds between successful !need uses.", FCVAR_NONE, true, 0.0);
+    gCvFailureCooldownSeconds = CreateConVar("sm_needwebhook_failure_cooldown", "60", "Cooldown in seconds after a failed or timed out !need attempt to prevent retry spam.", FCVAR_NONE, true, 0.0);
     gCvWebhookUrl = CreateConVar("sm_needwebhook_url", "", "Discord webhook URL.", FCVAR_PROTECTED);
     gCvModeLabel = CreateConVar("sm_needwebhook_mode", "Casual", "Game mode label shown in the Discord message.");
     gCvPlainContent = CreateConVar("sm_needwebhook_message", "Players needed! @EU server ping", "Plain Discord message text sent outside the embed.");
@@ -66,6 +68,7 @@ public void OnPluginStart()
     gCvImageExtension = CreateConVar("sm_needwebhook_image_ext", "jpg", "Map image extension used with sm_needwebhook_image_base.");
     gCvImageIncludePrefix = CreateConVar("sm_needwebhook_image_include_prefix", "1", "Use the full map name for the image URL, including prefixes like de_ and cs_. Set to 0 to strip the prefix.", FCVAR_NONE, true, 0.0, true, 1.0);
     gCvAnnounceText = CreateConVar("sm_needwebhook_announce", "Need message sent", "In-game confirmation text.");
+    gCvAnnounceMode = CreateConVar("sm_needwebhook_announce_mode", "1", "Who receives the in-game confirmation text: 0 = disabled, 1 = requester only, 2 = everyone.", FCVAR_NONE, true, 0.0, true, 2.0);
     gCvUsername = CreateConVar("sm_needwebhook_username", "Need Bot", "Webhook username override.");
     gCvAvatarUrl = CreateConVar("sm_needwebhook_avatar_url", "", "Webhook avatar URL.");
     gCvEmbedTitle = CreateConVar("sm_needwebhook_embed_title", "{CURRENT}/{MAX} - {MODE}", "Embed title template. Tokens: {CURRENT} {MAX} {MODE} {MAP} {CONNECT}");
@@ -103,6 +106,52 @@ public void OnLibraryRemoved(const char[] name)
 public void OnPluginEnd()
 {
     ClearWebhookPendingState(false);
+}
+
+void NotifyClient(int client, const char[] message)
+{
+    if (client <= 0 || !IsClientInGame(client) || message[0] == '\0')
+    {
+        return;
+    }
+
+    PrintToChat(client, "%s", message);
+}
+
+void AnnounceSuccessfulSend(int requester)
+{
+    StartCooldown(gCvCooldownSeconds.FloatValue);
+
+    char announceText[192];
+    gCvAnnounceText.GetString(announceText, sizeof(announceText));
+    if (announceText[0] == '\0')
+    {
+        strcopy(announceText, sizeof(announceText), "Need message sent");
+    }
+
+    int announceMode = gCvAnnounceMode.IntValue;
+    if (announceMode == 2)
+    {
+        PrintToChatAll("%s", announceText);
+    }
+    else if (announceMode == 1)
+    {
+        NotifyClient(requester, announceText);
+    }
+}
+
+void StartCooldown(float seconds)
+{
+    if (seconds <= 0.0)
+    {
+        return;
+    }
+
+    float nextAllowedUse = GetEngineTime() + seconds;
+    if (nextAllowedUse > gNextAllowedUse)
+    {
+        gNextAllowedUse = nextAllowedUse;
+    }
 }
 
 public Action Command_Need(int client, int args)
@@ -152,6 +201,7 @@ public Action Command_Need(int client, int args)
     Handle request = SteamWorks_CreateHTTPRequest(k_EHTTPMethodPOST, webhookUrl);
     if (request == INVALID_HANDLE)
     {
+        StartCooldown(gCvFailureCooldownSeconds.FloatValue);
         ReplyToCommand(client, "[Need] Failed to create the webhook request.");
         return Plugin_Handled;
     }
@@ -159,6 +209,7 @@ public Action Command_Need(int client, int args)
     if (!SteamWorks_SetHTTPCallbacks(request, OnWebhookCompleted))
     {
         delete request;
+        StartCooldown(gCvFailureCooldownSeconds.FloatValue);
         ReplyToCommand(client, "[Need] Failed to initialize the webhook callback.");
         return Plugin_Handled;
     }
@@ -169,16 +220,19 @@ public Action Command_Need(int client, int args)
     SteamWorks_SetHTTPRequestRawPostBody(request, "application/json", payload, strlen(payload));
 
     gWebhookPending = true;
-    gPendingRequesterSerial = GetClientSerial(client);
     gPendingWebhookRequest = request;
     StartWebhookTimeoutTimer();
 
     if (!SteamWorks_SendHTTPRequest(request))
     {
         ClearWebhookPendingState(true);
+        StartCooldown(gCvFailureCooldownSeconds.FloatValue);
         ReplyToCommand(client, "[Need] Failed to send the webhook request.");
         return Plugin_Handled;
     }
+
+    AnnounceSuccessfulSend(client);
+    ClearWebhookPendingState(false);
 
     return Plugin_Handled;
 }
@@ -432,38 +486,11 @@ int GetMaxHumanPlayersFromServer()
 public void OnWebhookCompleted(Handle request, bool failure, bool requestSuccessful, EHTTPStatusCode statusCode)
 {
     bool success = !failure && requestSuccessful && (statusCode == k_EHTTPStatusCode204NoContent || statusCode == k_EHTTPStatusCode200OK);
-    int requester = GetClientFromSerial(gPendingRequesterSerial);
-
-    if (request == gPendingWebhookRequest)
-    {
-        ClearWebhookPendingState(false);
-    }
-    else
-    {
-        delete request;
-    }
+    delete request;
 
     if (!success)
     {
         LogError("[Need] Discord webhook failed. failure=%d successful=%d status=%d", failure, requestSuccessful, statusCode);
-
-        if (requester > 0 && IsClientInGame(requester))
-        {
-            ReplyToCommand(requester, "[Need] Discord webhook failed. Please try again in a moment.");
-        }
-    }
-    else
-    {
-        gNextAllowedUse = GetEngineTime() + gCvCooldownSeconds.FloatValue;
-
-        char announceText[192];
-        gCvAnnounceText.GetString(announceText, sizeof(announceText));
-        if (announceText[0] == '\0')
-        {
-            strcopy(announceText, sizeof(announceText), "Need message sent");
-        }
-
-        PrintToChatAll("%s", announceText);
     }
 }
 
@@ -484,18 +511,10 @@ public Action OnWebhookTimeout(Handle timer)
         gWebhookTimeoutTimer = null;
     }
 
-    if (!gWebhookPending)
+    if (gWebhookPending)
     {
-        return Plugin_Stop;
-    }
-
-    int requester = GetClientFromSerial(gPendingRequesterSerial);
-    LogError("[Need] Webhook request timed out before SteamWorks completed the callback.");
-    ClearWebhookPendingState(false);
-
-    if (requester > 0 && IsClientInGame(requester))
-    {
-        ReplyToCommand(requester, "[Need] The webhook request timed out. Please try again.");
+        LogError("[Need] Webhook callback timed out after the request was already handed off.");
+        ClearWebhookPendingState(false);
     }
 
     return Plugin_Stop;
@@ -510,7 +529,6 @@ void ClearWebhookPendingState(bool closeRequest)
     }
 
     gWebhookPending = false;
-    gPendingRequesterSerial = 0;
 
     if (closeRequest && gPendingWebhookRequest != INVALID_HANDLE)
     {
